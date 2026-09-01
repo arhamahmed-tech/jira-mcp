@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Development files
+.git/
+.github/
+.vscode/
+.idea/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Build artifacts
+dist/
+build/
+*.tgz
+
+# Development-only files
+index-old.js
+files.zip
+mcp.json
+claude_desktop_config.json
+.pnpm-lock.yaml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+test/
+tests/
+__tests__/
+*.test.js
+*.spec.js
+coverage/
+.nyc_output/
+
+# Documentation (keep README.md)
+CHANGELOG.md
+CONTRIBUTING.md
+docs/

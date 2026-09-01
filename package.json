@@ -1,0 +1,39 @@
+{
+  "name": "jira-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for Jira — 30+ tools for issues, sprints, boards, worklogs, and more",
+  "type": "module",
+  "main": "cli.js",
+  "bin": {
+    "jira-mcp-server": "./cli.js"
+  },
+  "files": [
+    "cli.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node cli.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "jira",
+    "atlassian",
+    "project-management",
+    "issues",
+    "sprints"
+  ],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "axios": "^1.20.0",
+    "dayjs": "^1.11.23",
+    "zod": "^4.4.3"
+  }
+}
