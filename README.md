@@ -1,216 +1,207 @@
 # Jira MCP Server
 
-A Model Context Protocol (MCP) server that connects AI assistants to your Jira instance. Exposes 30+ tools for issues, sprints, boards, worklogs, users, and more.
+A Model Context Protocol (MCP) server for Jira with Streamable HTTP transport. Exposes 30+ tools for issues, sprints, boards, worklogs, users, and more.
+
+## Features
+
+- **Streamable HTTP transport** — connect via HTTP/HTTPS
+- **Per-request credentials** — users bring their own Jira credentials
+- **30+ tools** — issues, sprints, boards, worklogs, analytics
+- **CORS enabled** — works from any client
+- **Auth modes** — open or API-key protected
 
 ## Requirements
 
 - Node.js 18 or later
 - A Jira instance (Cloud or Server/Data Center)
-- Jira API credentials (see [Authentication](#authentication))
 
-## Installation
+## Quick Start
 
-### Quick Start with npx (Recommended)
-
-No installation required. Just run:
+### 1. Run the server
 
 ```bash
-JIRA_BASE_URL=https://your-domain.atlassian.net \
-JIRA_EMAIL=your-email@example.com \
-JIRA_API_TOKEN=your-api-token \
 npx jira-mcp-server
 ```
 
-### Install Globally
+Or install globally:
 
 ```bash
 npm install -g jira-mcp-server
-```
-
-Then run:
-
-```bash
-JIRA_BASE_URL=https://your-domain.atlassian.net \
-JIRA_EMAIL=your-email@example.com \
-JIRA_API_TOKEN=your-api-token \
 jira-mcp-server
 ```
 
-### Install as Project Dependency
+### 2. Server starts on port 3000
 
-```bash
-npm install jira-mcp-server
+```
+[jira-mcp-server] HTTP server running on http://localhost:3000
+[jira-mcp-server] MCP endpoint: http://localhost:3000/mcp
+[jira-mcp-server] Auth mode: open
 ```
 
-Then run:
+### 3. Connect from MCP client
 
-```bash
-npx jira-mcp-server
-```
+Users connect and provide their own Jira credentials via HTTP headers.
 
-## Authentication
+## Authentication Modes
 
-### Jira Cloud
+### Open Mode (default)
 
-```bash
-JIRA_BASE_URL=https://your-domain.atlassian.net
-JIRA_EMAIL=your-email@example.com
-JIRA_API_TOKEN=your-api-token
-```
-
-Get your API token at: https://id.atlassian.com/manage-profile/security/api-tokens
-
-### Jira Server / Data Center
-
-```bash
-JIRA_BASE_URL=http://your-jira-server:8080
-JIRA_USERNAME=your-username
-JIRA_API_TOKEN=your-password-or-personal-access-token
-```
-
-Generate a Personal Access Token (Jira Server 8.14+):
-Profile → Personal Access Tokens → Create token
-
-## MCP Client Configuration
-
-### Claude Desktop
-
-Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or
-`%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+Anyone can connect. Users provide their Jira credentials in headers:
 
 ```json
 {
   "mcpServers": {
     "jira": {
-      "command": "npx",
-      "args": ["-y", "jira-mcp-server"],
-      "env": {
-        "JIRA_BASE_URL": "https://your-domain.atlassian.net",
-        "JIRA_EMAIL": "your-email@example.com",
-        "JIRA_API_TOKEN": "your-api-token"
+      "url": "http://localhost:3000/mcp",
+      "headers": {
+        "X-Jira-Base-Url": "https://your-domain.atlassian.net",
+        "X-Jira-Email": "your-email@example.com",
+        "X-Jira-Token": "your-api-token"
       }
     }
   }
 }
 ```
 
-### Cursor / Windsurf
+### Authorized Mode
 
-Add to your MCP configuration:
+Requires an API key in addition to Jira credentials:
+
+```bash
+AUTH_MODE=authorized API_KEY=my-secret-key node cli.js
+```
 
 ```json
 {
-  "jira": {
-    "command": "npx",
-    "args": ["-y", "jira-mcp-server"],
-    "env": {
-      "JIRA_BASE_URL": "https://your-domain.atlassian.net",
-      "JIRA_EMAIL": "your-email@example.com",
-      "JIRA_API_TOKEN": "your-api-token"
+  "mcpServers": {
+    "jira": {
+      "url": "https://your-server.com/mcp",
+      "headers": {
+        "X-Api-Key": "my-secret-key",
+        "X-Jira-Base-Url": "https://your-domain.atlassian.net",
+        "X-Jira-Email": "your-email@example.com",
+        "X-Jira-Token": "your-api-token"
+      }
     }
   }
 }
 ```
 
-### Local Development (from clone)
+## Environment Variables
 
-```bash
-git clone https://github.com/your-username/jira-mcp-server.git
-cd jira-mcp-server
-npm install
-npm start
-```
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3000` | HTTP server port |
+| `AUTH_MODE` | `open` | `open` or `authorized` |
+| `API_KEY` | — | Required when `AUTH_MODE=authorized` |
+
+## HTTP Headers (User Credentials)
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `X-Jira-Base-Url` | Yes | Jira instance URL (no trailing slash) |
+| `X-Jira-Token` | Yes | API token or password |
+| `X-Jira-Email` | Conditional | Email for Jira Cloud |
+| `X-Jira-Username` | Conditional | Username for Jira Server/Data Center |
+
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Health check / server info |
+| `/mcp` | POST | MCP Streamable HTTP endpoint |
 
 ## Available Tools
 
 ### Issues
 | Tool | Description |
 |------|-------------|
-| `create_issue` | Create a single Jira issue with full field support |
-| `bulk_create_issues` | Create multiple issues in one call |
-| `get_issue` | Fetch full details of an issue |
-| `update_issue` | Update summary, description, priority, assignee, labels |
-| `transition_issue` | Move an issue to a new status |
-| `clone_issue` | Clone an issue to same or different project |
-| `link_issues` | Link two issues together |
+| `create_issue` | Create a single Jira issue |
+| `bulk_create_issues` | Create multiple issues |
+| `get_issue` | Fetch issue details |
+| `update_issue` | Update issue fields |
+| `transition_issue` | Change issue status |
+| `clone_issue` | Clone an issue |
+| `link_issues` | Link two issues |
 | `delete_issue` | Delete an issue |
-| `issue_changelog` | Get change history for an issue |
+| `issue_changelog` | Get change history |
 
 ### Search & Analytics
 | Tool | Description |
 |------|-------------|
-| `search_issues` | Search using JQL queries |
-| `my_issues` | Get issues assigned to current user |
-| `project_summary` | Get project analytics and statistics |
-| `assignee_workload` | See workload distribution |
+| `search_issues` | JQL search |
+| `my_issues` | Current user's issues |
+| `project_summary` | Project statistics |
+| `assignee_workload` | Workload distribution |
 | `overdue_issues` | Find overdue issues |
 
 ### Comments & Worklogs
 | Tool | Description |
 |------|-------------|
-| `add_comment` | Post a comment on an issue |
-| `list_comments` | List comments on an issue |
-| `log_work` | Log work time on an issue |
+| `add_comment` | Post a comment |
+| `list_comments` | List comments |
+| `log_work` | Log work time |
 | `get_worklogs` | Get worklog entries |
 
 ### Sprints & Boards
 | Tool | Description |
 |------|-------------|
-| `list_boards` | List all boards |
-| `list_sprints` | List sprints for a board |
-| `sprint_issues` | Get issues in a sprint |
-| `move_to_sprint` | Move issues to a sprint |
-| `active_sprint_summary` | Get active sprint progress |
+| `list_boards` | List boards |
+| `list_sprints` | List sprints |
+| `sprint_issues` | Sprint issue list |
+| `move_to_sprint` | Move issues to sprint |
+| `active_sprint_summary` | Sprint progress |
 
-### Projects & Configuration
+### Projects & Config
 | Tool | Description |
 |------|-------------|
-| `list_projects` | List all accessible projects |
-| `manage_versions` | List, create, release, or archive versions |
-| `manage_components` | List, create, or delete components |
-| `get_issue_types` | Get issue types for a project |
+| `list_projects` | List projects |
+| `manage_versions` | Version management |
+| `manage_components` | Component management |
+| `get_issue_types` | Issue type list |
 
 ### Users & Helpers
 | Tool | Description |
 |------|-------------|
-| `search_users` | Search for users |
-| `get_current_user` | Get current user info |
-| `bulk_transition` | Transition multiple issues at once |
-| `bulk_assign` | Assign multiple issues at once |
+| `search_users` | Search users |
+| `get_current_user` | Current user info |
+| `bulk_transition` | Bulk status changes |
+| `bulk_assign` | Bulk assignment |
 
-## Example Prompts
+## Deployment
 
-```
-Create a high-priority bug in project PROJ titled "Login page crashes on Safari"
-```
+### Netlify Functions
 
-```
-Search for all open tasks assigned to john.doe in the MOBILE project
-```
+Create `netlify/functions/mcp.js`:
 
-```
-Bulk create these tasks in BACKEND project:
-- Set up CI pipeline
-- Write API documentation
-- Add rate limiting middleware
+```javascript
+export { handler } from "../cli.js";
 ```
 
-```
-Transition PROJ-42 to "In Progress" with comment "Starting this now"
+Set environment variables in Netlify dashboard:
+- `AUTH_MODE=open` or `AUTH_MODE=authorized`
+- `API_KEY` (if using authorized mode)
+
+### Docker
+
+```dockerfile
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm install --production
+COPY . .
+EXPOSE 3000
+CMD ["node", "cli.js"]
 ```
 
-```
-What's my current sprint progress?
-```
+### Any Node.js Hosting
 
-## Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `JIRA_BASE_URL` | Yes | Base URL of your Jira instance (no trailing slash) |
-| `JIRA_API_TOKEN` | Yes | API token or password |
-| `JIRA_EMAIL` | Conditional | Email for Jira Cloud (required if not using username) |
-| `JIRA_USERNAME` | Conditional | Username for Jira Server/Data Center (required if not using email) |
+```bash
+git clone https://github.com/your-username/jira-mcp-server.git
+cd jira-mcp-server
+npm install
+PORT=8080 node cli.js
+```
 
 ## Development
 
@@ -220,59 +211,22 @@ What's my current sprint progress?
 git clone https://github.com/your-username/jira-mcp-server.git
 cd jira-mcp-server
 npm install
-```
-
-### Running Locally
-
-```bash
 npm start
 ```
 
-Or with environment variables:
+### Test Locally
 
 ```bash
-JIRA_BASE_URL=https://your-domain.atlassian.net \
-JIRA_EMAIL=your-email@example.com \
-JIRA_API_TOKEN=your-api-token \
-node index.js
-```
+# Health check
+curl http://localhost:3000/
 
-### Testing Changes
-
-After making changes, test the server:
-
-```bash
-# Test that the server starts
-JIRA_BASE_URL=https://test.example.com \
-JIRA_EMAIL=test@example.com \
-JIRA_API_TOKEN=test \
-node index.js
-
-# Should show: [jira-mcp v2] 30 tools ready — https://test.example.com
-```
-
-## Building & Publishing
-
-### Package for Testing
-
-```bash
-npm pack --dry-run  # Preview what will be included
-npm pack            # Create .tgz file
-```
-
-### Publish to npm
-
-```bash
-npm login
-npm publish
-```
-
-### Version Bumping
-
-```bash
-npm version patch  # 1.0.0 → 1.0.1
-npm version minor  # 1.0.0 → 1.1.0
-npm version major  # 1.0.0 → 2.0.0
+# MCP request (with credentials)
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "X-Jira-Base-Url: https://your-domain.atlassian.net" \
+  -H "X-Jira-Email: your-email@example.com" \
+  -H "X-Jira-Token: your-api-token" \
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"test","version":"1.0"},"capabilities":{}}}'
 ```
 
 ## License
