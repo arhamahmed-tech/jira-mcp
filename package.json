@@ -10,11 +10,15 @@
   "files": [
     "cli.js",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "netlify/"
   ],
   "scripts": {
     "start": "node cli.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "npx netlify dev",
+    "build": "npm test",
+    "test": "node --test test/*.test.js",
+    "pretest": "mkdir -p test"
   },
   "keywords": [
     "mcp",
@@ -23,7 +27,8 @@
     "atlassian",
     "project-management",
     "issues",
-    "sprints"
+    "sprints",
+    "netlify"
   ],
   "author": "",
   "license": "ISC",

@@ -7,6 +7,7 @@ A Model Context Protocol (MCP) server for Jira with Streamable HTTP transport. E
 - **Streamable HTTP transport** — connect via HTTP/HTTPS
 - **Per-request credentials** — users bring their own Jira credentials
 - **30+ tools** — issues, sprints, boards, worklogs, analytics
+- **Netlify ready** — deploy as serverless function
 - **CORS enabled** — works from any client
 - **Auth modes** — open or API-key protected
 
@@ -17,85 +18,147 @@ A Model Context Protocol (MCP) server for Jira with Streamable HTTP transport. E
 
 ## Quick Start
 
-### 1. Run the server
+### Local Development
 
 ```bash
-npx jira-mcp-server
+# Install dependencies
+npm install
+
+# Start local server
+npm start
+
+# Or use Netlify CLI for local development
+npm run dev
 ```
 
-Or install globally:
+### Test Locally
 
 ```bash
-npm install -g jira-mcp-server
-jira-mcp-server
+# Health check
+curl http://localhost:3000/
+
+# MCP request (with credentials)
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "X-Jira-Base-Url: https://your-domain.atlassian.net" \
+  -H "X-Jira-Email: your-email@example.com" \
+  -H "X-Jira-Token: your-api-token" \
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"test","version":"1.0"},"capabilities":{}}}'
 ```
 
-### 2. Server starts on port 3000
+## Deploy to Netlify
+
+### Step 1: Push to Git
+
+```bash
+git add .
+git commit -m "Prepare for Netlify deployment"
+git push origin main
+```
+
+### Step 2: Connect to Netlify
+
+1. Go to [app.netlify.com](https://app.netlify.com)
+2. Click "Add new site" → "Import an existing project"
+3. Select your Git provider (GitHub, GitLab, etc.)
+4. Select the `jira-mcp-server` repository
+
+### Step 3: Configure Build Settings
+
+In the Netlify UI, enter these exact values:
+
+| Setting | Value |
+|---------|-------|
+| **Branch** | `main` |
+| **Base directory** | (leave empty) |
+| **Build command** | `npm install` |
+| **Publish directory** | `.` |
+| **Functions directory** | `netlify/functions` |
+
+### Step 4: Set Environment Variables
+
+Go to **Site Settings → Environment Variables** and add:
+
+| Variable | Value | Description |
+|----------|-------|-------------|
+| `AUTH_MODE` | `open` | Set to `authorized` to require API key |
+| `API_KEY` | (your secret key) | Required if `AUTH_MODE=authorized` |
+
+### Step 5: Deploy
+
+Click "Deploy site" and wait for the build to complete.
+
+Your MCP endpoint will be available at:
 
 ```
-[jira-mcp-server] HTTP server running on http://localhost:3000
-[jira-mcp-server] MCP endpoint: http://localhost:3000/mcp
-[jira-mcp-server] Auth mode: open
+https://YOUR-SITE-NAME.netlify.app/mcp
 ```
 
-### 3. Connect from MCP client
+## MCP Client Configuration
 
-Users connect and provide their own Jira credentials via HTTP headers.
+### Claude Desktop
 
-## Authentication Modes
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or
+`%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "jira": {
+      "url": "https://YOUR-SITE-NAME.netlify.app/mcp",
+      "headers": {
+        "X-Jira-Base-Url": "https://your-domain.atlassian.net",
+        "X-Jira-Email": "your-email@example.com",
+        "X-Jira-Token": "your-api-token"
+      }
+    }
+  }
+}
+```
+
+### Cursor / Windsurf
+
+```json
+{
+  "mcpServers": {
+    "jira": {
+      "url": "https://YOUR-SITE-NAME.netlify.app/mcp",
+      "headers": {
+        "X-Jira-Base-Url": "https://your-domain.atlassian.net",
+        "X-Jira-Email": "your-email@example.com",
+        "X-Jira-Token": "your-api-token"
+      }
+    }
+  }
+}
+```
+
+### With API Key (Authorized Mode)
+
+If `AUTH_MODE=authorized`, add the API key to headers:
+
+```json
+{
+  "mcpServers": {
+    "jira": {
+      "url": "https://YOUR-SITE-NAME.netlify.app/mcp",
+      "headers": {
+        "X-Api-Key": "your-api-key",
+        "X-Jira-Base-Url": "https://your-domain.atlassian.net",
+        "X-Jira-Email": "your-email@example.com",
+        "X-Jira-Token": "your-api-token"
+      }
+    }
+  }
+}
+```
+
+## Authentication
 
 ### Open Mode (default)
 
 Anyone can connect. Users provide their Jira credentials in headers:
-
-```json
-{
-  "mcpServers": {
-    "jira": {
-      "url": "http://localhost:3000/mcp",
-      "headers": {
-        "X-Jira-Base-Url": "https://your-domain.atlassian.net",
-        "X-Jira-Email": "your-email@example.com",
-        "X-Jira-Token": "your-api-token"
-      }
-    }
-  }
-}
-```
-
-### Authorized Mode
-
-Requires an API key in addition to Jira credentials:
-
-```bash
-AUTH_MODE=authorized API_KEY=my-secret-key node cli.js
-```
-
-```json
-{
-  "mcpServers": {
-    "jira": {
-      "url": "https://your-server.com/mcp",
-      "headers": {
-        "X-Api-Key": "my-secret-key",
-        "X-Jira-Base-Url": "https://your-domain.atlassian.net",
-        "X-Jira-Email": "your-email@example.com",
-        "X-Jira-Token": "your-api-token"
-      }
-    }
-  }
-}
-```
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `3000` | HTTP server port |
-| `AUTH_MODE` | `open` | `open` or `authorized` |
-| `API_KEY` | — | Required when `AUTH_MODE=authorized` |
-
-## HTTP Headers (User Credentials)
 
 | Header | Required | Description |
 |--------|----------|-------------|
@@ -104,16 +167,48 @@ AUTH_MODE=authorized API_KEY=my-secret-key node cli.js
 | `X-Jira-Email` | Conditional | Email for Jira Cloud |
 | `X-Jira-Username` | Conditional | Username for Jira Server/Data Center |
 
+### Authorized Mode
+
+Requires an API key in addition to Jira credentials:
+
+```bash
+# Set in Netlify Dashboard
+AUTH_MODE=authorized
+API_KEY=your-secret-api-key
+```
+
+Users must include the API key in requests:
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `X-Api-Key` | Yes | Your API key |
+
+## Environment Variables
+
+### Server Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3000` | HTTP server port (local only) |
+| `AUTH_MODE` | `open` | `open` or `authorized` |
+| `API_KEY` | — | Required when `AUTH_MODE=authorized` |
+
+### User Credentials (via Headers)
+
+Users provide Jira credentials via HTTP headers, not environment variables.
+
 ## API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/` | GET | Health check / server info |
+| `/` | GET | Health check |
 | `/mcp` | POST | MCP Streamable HTTP endpoint |
+| `/health` | GET | Health check |
 
 ## Available Tools
 
 ### Issues
+
 | Tool | Description |
 |------|-------------|
 | `create_issue` | Create a single Jira issue |
@@ -127,6 +222,7 @@ AUTH_MODE=authorized API_KEY=my-secret-key node cli.js
 | `issue_changelog` | Get change history |
 
 ### Search & Analytics
+
 | Tool | Description |
 |------|-------------|
 | `search_issues` | JQL search |
@@ -136,6 +232,7 @@ AUTH_MODE=authorized API_KEY=my-secret-key node cli.js
 | `overdue_issues` | Find overdue issues |
 
 ### Comments & Worklogs
+
 | Tool | Description |
 |------|-------------|
 | `add_comment` | Post a comment |
@@ -144,6 +241,7 @@ AUTH_MODE=authorized API_KEY=my-secret-key node cli.js
 | `get_worklogs` | Get worklog entries |
 
 ### Sprints & Boards
+
 | Tool | Description |
 |------|-------------|
 | `list_boards` | List boards |
@@ -153,6 +251,7 @@ AUTH_MODE=authorized API_KEY=my-secret-key node cli.js
 | `active_sprint_summary` | Sprint progress |
 
 ### Projects & Config
+
 | Tool | Description |
 |------|-------------|
 | `list_projects` | List projects |
@@ -161,6 +260,7 @@ AUTH_MODE=authorized API_KEY=my-secret-key node cli.js
 | `get_issue_types` | Issue type list |
 
 ### Users & Helpers
+
 | Tool | Description |
 |------|-------------|
 | `search_users` | Search users |
@@ -168,66 +268,69 @@ AUTH_MODE=authorized API_KEY=my-secret-key node cli.js
 | `bulk_transition` | Bulk status changes |
 | `bulk_assign` | Bulk assignment |
 
-## Deployment
-
-### Netlify Functions
-
-Create `netlify/functions/mcp.js`:
-
-```javascript
-export { handler } from "../cli.js";
-```
-
-Set environment variables in Netlify dashboard:
-- `AUTH_MODE=open` or `AUTH_MODE=authorized`
-- `API_KEY` (if using authorized mode)
-
-### Docker
-
-```dockerfile
-FROM node:18-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm install --production
-COPY . .
-EXPOSE 3000
-CMD ["node", "cli.js"]
-```
-
-### Any Node.js Hosting
+## Testing
 
 ```bash
-git clone https://github.com/your-username/jira-mcp-server.git
-cd jira-mcp-server
-npm install
-PORT=8080 node cli.js
+# Run tests
+npm test
+
+# Test with coverage
+npm run test:coverage
 ```
 
 ## Development
 
-### From Source
+### Project Structure
 
-```bash
-git clone https://github.com/your-username/jira-mcp-server.git
-cd jira-mcp-server
-npm install
-npm start
+```
+jira-mcp-server/
+├── cli.js                          # Local development server
+├── netlify/
+│   └── functions/
+│       ├── mcp.js                  # Netlify Function (MCP endpoint)
+│       └── health.js               # Netlify Function (health check)
+├── test/
+│   └── mcp.test.js                 # Tests
+├── netlify.toml                    # Netlify configuration
+├── package.json
+└── README.md
 ```
 
-### Test Locally
+### Local Development
+
+```bash
+# Install dependencies
+npm install
+
+# Start local server
+npm start
+
+# Or use Netlify CLI
+npm run dev
+```
+
+### Testing the Deployment
 
 ```bash
 # Health check
-curl http://localhost:3000/
+curl https://YOUR-SITE-NAME.netlify.app/health
 
-# MCP request (with credentials)
-curl -X POST http://localhost:3000/mcp \
+# MCP endpoint
+curl -X POST https://YOUR-SITE-NAME.netlify.app/mcp \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -H "X-Jira-Base-Url: https://your-domain.atlassian.net" \
   -H "X-Jira-Email: your-email@example.com" \
   -H "X-Jira-Token: your-api-token" \
   -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"test","version":"1.0"},"capabilities":{}}}'
 ```
+
+## Security
+
+- **Never commit `.env` files** — they're gitignored
+- **Use `AUTH_MODE=authorized`** in production to require API keys
+- **Jira credentials stay with the user** — they're sent via headers, not stored on the server
+- **No secrets in code** — all configuration is via environment variables
 
 ## License
 
