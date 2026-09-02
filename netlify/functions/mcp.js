@@ -9,8 +9,9 @@
  *   X-Jira-Username: your-username (for Server/Data Center)
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { toFetchResponse, toReqRes } from "fetch-to-node";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import axios from "axios";
 import { z } from "zod";
 import dayjs from "dayjs";
@@ -847,111 +848,56 @@ function registerTools(server, jira) {
 }
 
 // ─── Netlify Function Handler ───────────────────────────────────────────────
-export default async (request, context) => {
-  const url = new URL(request.url);
-  const path = url.pathname;
+export default async (req) => {
+  try {
+    if (req.method === "POST") {
+      const { req: nodeReq, res: nodeRes } = toReqRes(req);
 
-  // CORS headers
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, X-Api-Key, X-Jira-Base-Url, X-Jira-Email, X-Jira-Token, X-Jira-Username, Mcp-Session-Id",
-    "Access-Control-Expose-Headers": "Mcp-Session-Id",
-  };
+      const jira = createJiraClient(Object.fromEntries(req.headers.entries()));
+      if (!jira) {
+        nodeRes.writeHead(400, { "Content-Type": "application/json" });
+        nodeRes.end(JSON.stringify({
+          error: "Missing Jira credentials. Required headers: X-Jira-Base-Url, X-Jira-Token, X-Jira-Email or X-Jira-Username",
+        }));
+        return toFetchResponse(nodeRes);
+      }
 
-  // Handle CORS preflight
-  if (request.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
-
-  // Health check
-  if (request.method === "GET" && (path === "/health" || path === "/")) {
-    return Response.json(
-      {
-        name: "jira-mcp-server",
-        version: "1.0.0",
-        status: "ok",
-        transport: "streamable-http",
-      },
-      { headers: corsHeaders }
-    );
-  }
-
-  // MCP endpoint
-  if (request.method === "POST" && (path === "/mcp" || path === "/.netlify/functions/mcp")) {
-    // Extract Jira credentials from headers
-    const jira = createJiraClient(Object.fromEntries(request.headers.entries()));
-    if (!jira) {
-      return Response.json(
-        {
-          error: "Missing Jira credentials",
-          required: ["X-Jira-Base-Url", "X-Jira-Token", "X-Jira-Email or X-Jira-Username"],
-        },
-        { status: 400, headers: corsHeaders }
+      const server = new McpServer(
+        { name: "jira-mcp-server", version: "1.0.0" },
+        { capabilities: { logging: {} } }
       );
-    }
+      registerTools(server, jira);
 
-    // Create server and transport for this request
-    const server = new McpServer({
-      name: "jira-mcp-server",
-      version: "1.0.0",
-      description: `Jira MCP server — ${jira.baseUrl}`,
-    });
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+      });
 
-    registerTools(server, jira);
-
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined, // stateless
-    });
-
-    try {
       await server.connect(transport);
 
-      // Convert Web API Request to Node.js-like request for the transport
-      const body = await request.text();
-      const nodeReq = {
-        method: request.method,
-        headers: Object.fromEntries(request.headers.entries()),
-        url: request.url,
-        body: body,
-        on: () => {},
-      };
+      const body = await req.json();
+      await transport.handleRequest(nodeReq, nodeRes, body);
 
-      // Create a mock response collector
-      let responseStatus = 200;
-      let responseHeaders = {};
-      let responseBody = "";
-
-      const nodeRes = {
-        setHeader: (key, value) => { responseHeaders[key] = value; },
-        writeHead: (status, headers) => {
-          responseStatus = status;
-          if (headers) Object.assign(responseHeaders, headers);
-        },
-        end: (data) => { responseBody = data || ""; },
-        write: (data) => { responseBody += data; },
-        get statusCode() { return responseStatus; },
-        get headersSent() { return false; },
-      };
-
-      await transport.handleRequest(nodeReq, nodeRes);
-
-      return new Response(responseBody, {
-        status: responseStatus,
-        headers: { ...responseHeaders, ...corsHeaders },
+      nodeRes.on("close", () => {
+        transport.close();
+        server.close();
       });
-    } catch (error) {
-      console.error("MCP request error:", error);
-      return Response.json(
-        { error: "Internal server error" },
-        { status: 500, headers: corsHeaders }
-      );
-    }
-  }
 
-  // 404 for unknown routes
-  return Response.json(
-    { error: "Not found" },
-    { status: 404, headers: corsHeaders }
-  );
+      return toFetchResponse(nodeRes);
+    }
+
+    return new Response("Method not allowed", { status: 405 });
+  } catch (error) {
+    console.error("MCP error:", error);
+    return new Response(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        error: { code: -32603, message: "Internal server error" },
+        id: null,
+      }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
 };
+
+// Route this function to /mcp
+export const config = { path: "/mcp" };

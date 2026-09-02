@@ -1,17 +1,26 @@
 /**
  * Netlify Function: Health Check
- * Returns server status without exposing sensitive information.
  */
 
 export default async (request, context) => {
-  return Response.json({
-    name: "jira-mcp-server",
-    version: "1.0.0",
-    status: "ok",
-    transport: "streamable-http",
-    endpoints: {
-      mcp: "/mcp",
-      health: "/health",
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  return Response.json(
+    {
+      name: "jira-mcp-server",
+      version: "1.0.0",
+      status: "ok",
+      transport: "streamable-http",
+      timestamp: new Date().toISOString(),
     },
-  });
+    { headers: corsHeaders }
+  );
 };
